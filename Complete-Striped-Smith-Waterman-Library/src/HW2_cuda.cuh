@@ -1,5 +1,3 @@
-
-
 #pragma once
 #include <cuda_runtime.h>
 void striped_sw_cuda_launcher(

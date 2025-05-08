@@ -1,5 +1,3 @@
-
-// HW2_cuda.cu
 #include <cuda_runtime.h>
 #include "HW2_cuda.cuh"
 #include <stdio.h>
@@ -11,27 +9,27 @@ void striped_sw_kernel(
     int* DP_flat)
 {
     
-    // 一個 block，queryLen 條 thread，每條 thread 對應 query 的一個位置
+
     int qpos = threadIdx.x + blockIdx.x * blockDim.x;
     if (qpos > queryLen) return;
-    // 這裡的 H、E、F 跟 scalar 或 SIMD 一樣
+
     int H = 0;
     int E = 0;
     int F = 0;
 
-    // 每個 thread 有一個自己的 DP column
-    extern __shared__ int prev_Hs[];  // 上一 row 的 H 值
 
-    // 初始化 prev_Hs
+    extern __shared__ int prev_Hs[];  
+
+
     if (qpos <= queryLen) prev_Hs[qpos] = 0;
     
     __syncthreads();
 
-    // row by row
+
     for (int r = 1; r <= refLen; ++r) {
 
         int diag = (qpos == 0) ? 0 : prev_Hs[qpos - 1];
-        int left = (qpos == 0) ? 0 : prev_Hs[qpos];  // prev row same column
+        int left = (qpos == 0) ? 0 : prev_Hs[qpos];  
 
         int match_score = 0;
         if (qpos > 0 && qpos <= queryLen) {
@@ -48,26 +46,21 @@ void striped_sw_kernel(
             // printf("%d ",h);
             // printf("\n");
             // printf("\n");
-            // Lazy loop (模擬 xsimd 的 lazy-F loop)
+
             while (h < (E + gap)) {
                 E += gap;
                 h = max(h, E);
             }
         }
-
-        // 更新 DP
         if (qpos <= queryLen)
             DP_flat[r * (queryLen + 1) + qpos] = h;
 
-        // 保存 H 給下一 row
-        __syncthreads();  // 保證所有 thread 都算完
+        __syncthreads(); 
         prev_Hs[qpos] = h;
-
-        // 更新 E、F
         E = h;
         F = h;
 
-        __syncthreads();  // 保證下一 row 前同步
+        __syncthreads();  
     }
 }
 
@@ -91,7 +84,6 @@ void striped_sw_cuda_launcher(
 
     size_t shared_mem_size = (queryLen + 1) * sizeof(int);
 
-    // 每一個 query position 對應一個 thread
     int threadsPerBlock = 256;
     int totalThreads = queryLen + 1;
     int numBlocks = (totalThreads + threadsPerBlock - 1) / threadsPerBlock;
